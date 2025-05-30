@@ -125,6 +125,13 @@ def cancel_and_delete(delete_dir, username, files):
     if os.path.exists(delete_dir):
         shutil.rmtree(delete_dir)
 
+def retry(username, files) -> bool:
+    success = slskd.transfers.enqueue(username = username, files = files)
+    if success:
+        logger.info(f"SUCCESSFUL ENQUEUED FILES: {len(files)}")
+    else:
+        logger.info(f"FAILED ENQUEUED FILES: {len(files)}")
+    return success
 
 def release_trackcount_mode(releases):
     track_count = {}
@@ -428,10 +435,12 @@ def grab_most_wanted(albums):
             for directory in downloads["directories"]:
                 if directory["directory"] == dir["name"]:
                     # Generate list of errored or failed downloads
+                    retry_files = [file for file in directory["files"] if file["state"] in [
+                        'Completed, Errored',
+                    ]]
                     errored_files = [file for file in directory["files"] if file["state"] in [
                         'Completed, Cancelled',
                         'Completed, TimedOut',
-                        'Completed, Errored',
                         'Completed, Rejected',
                     ]]
                     # Generate list of downloads still pending
@@ -442,6 +451,13 @@ def grab_most_wanted(albums):
                         logger.error(f"FAILED: Username: {username} Directory: {dir['name']}")
                         cancel_and_delete(artist_folder['dir'], artist_folder['username'], directory["files"])
                         grab_list.remove(artist_folder)
+                    elif len(retry_files) > 0:
+                        logger.warning(f"RETRYING: Username: {username} Directory: {dir['name']}")
+                        if not retry(artist_folder['username'], retry_files):
+                            cancel_and_delete(artist_folder['dir'], artist_folder['username'], directory["files"])
+                            grab_list.remove(artist_folder)
+                        else:
+                            unfinished += 1
                     elif len(pending_files) > 0:
                         unfinished += 1
 
