@@ -434,6 +434,7 @@ def grab_most_wanted(albums):
 
             for directory in downloads["directories"]:
                 if directory["directory"] == dir["name"]:
+                    logger.info(f"Checking status of directory: {directory['directory']}")
                     # Generate list of errored or failed downloads
                     retry_files = [file for file in directory["files"] if file["state"] in [
                         'Completed, Errored',
